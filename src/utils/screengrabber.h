@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,18 +15,18 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef SCREENGRABBER_H
-#define SCREENGRABBER_H
+#pragma once
 
+#include "src/utils/desktopinfo.h"
 #include <QObject>
 
-class ScreenGrabber : public QObject
-{
+class ScreenGrabber : public QObject {
     Q_OBJECT
 public:
     explicit ScreenGrabber(QObject *parent = nullptr);
-    QPixmap grabEntireDesktop();
+    QPixmap grabEntireDesktop(bool &ok);
+    QPixmap grabScreen(int screenNumber, bool &ok);
 
+private:
+    DesktopInfo m_info;
 };
-
-#endif // SCREENGRABBER_H

@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -16,30 +16,45 @@
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "controller.h"
-#include "src/capture/widget/capturewidget.h"
+#include "src/widgets/capture/capturewidget.h"
 #include "src/utils/confighandler.h"
-#include "src/infowindow.h"
+#include "src/widgets/infowindow.h"
 #include "src/config/configwindow.h"
-#include "src/capture/widget/capturebutton.h"
+#include "src/widgets/capture/capturebutton.h"
+#include "src/utils/systemnotification.h"
+#include "src/utils/screengrabber.h"
 #include <QFile>
 #include <QApplication>
 #include <QSystemTrayIcon>
 #include <QAction>
 #include <QMenu>
+#include <QDesktopWidget>
+
+#ifdef Q_OS_WIN
+#include "src/core/globalshortcutfilter.h"
+#endif
 
 // Controller is the core component of Flameshot, creates the trayIcon and
 // launches the capture widget
 
-Controller::Controller() : m_captureWindow(nullptr)
-{
+Controller::Controller() : m_captureWindow(nullptr) {
     qApp->setQuitOnLastWindowClosed(false);
 
     // init tray icon
+#if defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
     if (!ConfigHandler().disabledTrayIconValue()) {
         enableTrayIcon();
     }
+#elif defined(Q_OS_WIN)
+    enableTrayIcon();
 
-    initDefaults();
+    GlobalShortcutFilter *nativeFilter = new GlobalShortcutFilter(this);
+    qApp->installNativeEventFilter(nativeFilter);
+    connect(nativeFilter, &GlobalShortcutFilter::printPressed,
+            this, [this](){
+        this->requestCapture(CaptureRequest(CaptureRequest::GRAPHICAL_MODE));
+    });
+#endif
 
     QString StyleSheet = CaptureButton::globalStyleSheet();
     qApp->setStyleSheet(StyleSheet);
@@ -50,21 +65,84 @@ Controller *Controller::getInstance() {
     return &c;
 }
 
-// initDefaults inits the global config in the first execution of the program
-void Controller::initDefaults() {
-    ConfigHandler config;
-    //config.setNotInitiated();
-    if (!config.initiatedIsSet()) {
-        config.setDefaults();
-        config.setInitiated();
+void Controller::enableExports() {
+    connect(this, &Controller::captureTaken,
+            this, &Controller::handleCaptureTaken);
+    connect(this, &Controller::captureFailed,
+            this, &Controller::handleCaptureFailed);
+}
+
+void Controller::requestCapture(const CaptureRequest &request) {
+    uint id = request.id();
+    m_requestMap.insert(id, request);
+
+    switch (request.captureMode()) {
+    case CaptureRequest::FULLSCREEN_MODE:
+        doLater(request.delay(), this, [this, id](){
+            this->startFullscreenCapture(id);
+        });
+        break;
+    case CaptureRequest::SCREEN_MODE: {
+        int &&number = request.data().toInt();
+        doLater(request.delay(), this, [this, id, number](){
+            this->startScreenGrab(id, number);
+        });
+        break;
+    } case CaptureRequest::GRAPHICAL_MODE: {
+        QString &&path = request.path();
+        doLater(request.delay(), this, [this, id, path](){
+            this->startVisualCapture(id, path);
+        });
+        break;
+    } default:
+        emit captureFailed(id);
+        break;
     }
 }
 
 // creation of a new capture in GUI mode
-void Controller::createVisualCapture(const QString &forcedSavePath) {
+void Controller::startVisualCapture(const uint id, const QString &forcedSavePath) {
     if (!m_captureWindow) {
-        m_captureWindow = new CaptureWidget(forcedSavePath);
+        QWidget *modalWidget = nullptr;
+        do {
+            modalWidget = qApp->activeModalWidget();
+            if (modalWidget) {
+                modalWidget->close();
+                modalWidget->deleteLater();
+            }
+        } while (modalWidget);
+
+        m_captureWindow = new CaptureWidget(id, forcedSavePath);
+        //m_captureWindow = new CaptureWidget(id, forcedSavePath, false); // debug
+        connect(m_captureWindow, &CaptureWidget::captureFailed,
+                this, &Controller::captureFailed);
+        connect(m_captureWindow, &CaptureWidget::captureTaken,
+                this, &Controller::captureTaken);
+
+#ifdef Q_OS_WIN
+        m_captureWindow->show();
+#else
         m_captureWindow->showFullScreen();
+        //m_captureWindow->show(); // Debug
+#endif
+    } else {
+        emit captureFailed(id);
+    }
+}
+
+void Controller::startScreenGrab(const uint id, const int screenNumber) {
+    bool ok = true;
+    int n = screenNumber;
+
+    if (n < 0) {
+        QPoint globalCursorPos = QCursor::pos();
+        n = qApp->desktop()->screenNumber(globalCursorPos);
+    }
+    QPixmap p(ScreenGrabber().grabScreen(n, ok));
+    if (ok) {
+        emit captureTaken(id, p);
+    } else {
+        emit captureFailed(id);
     }
 }
 
@@ -88,6 +166,11 @@ void Controller::enableTrayIcon() {
         return;
     }
     ConfigHandler().setDisabledTrayIcon(false);
+    QAction *captureAction = new QAction(tr("&Take Screenshot"), this);
+    connect(captureAction, &QAction::triggered, this, [this](){
+        // Wait 400 ms to hide the QMenu
+        doLater(400, this, [this](){ this->startVisualCapture(); });
+    });
     QAction *configAction = new QAction(tr("&Configuration"), this);
     connect(configAction, &QAction::triggered, this,
             &Controller::openConfigWindow);
@@ -99,6 +182,7 @@ void Controller::enableTrayIcon() {
             &QCoreApplication::quit);
 
     QMenu *trayIconMenu = new QMenu();
+    trayIconMenu->addAction(captureAction);
     trayIconMenu->addAction(configAction);
     trayIconMenu->addAction(infoAction);
     trayIconMenu->addSeparator();
@@ -107,11 +191,12 @@ void Controller::enableTrayIcon() {
     m_trayIcon = new QSystemTrayIcon();
     m_trayIcon->setToolTip("Flameshot");
     m_trayIcon->setContextMenu(trayIconMenu);
-    m_trayIcon->setIcon(QIcon(":img/flameshot.png"));
+    QIcon trayicon = QIcon::fromTheme("flameshot-tray", QIcon(":img/app/flameshot.png"));
+    m_trayIcon->setIcon(trayicon);
 
     auto trayIconActivated = [this](QSystemTrayIcon::ActivationReason r){
         if (r == QSystemTrayIcon::Trigger) {
-            createVisualCapture();
+            startVisualCapture();
         }
     };
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, trayIconActivated);
@@ -119,14 +204,56 @@ void Controller::enableTrayIcon() {
 }
 
 void Controller::disableTrayIcon() {
+#if defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
     if (m_trayIcon) {
         m_trayIcon->deleteLater();
     }
     ConfigHandler().setDisabledTrayIcon(true);
+#endif
+}
+
+void Controller::sendTrayNotification(
+        const QString &text,
+        const QString &title,
+        const int timeout)
+{
+    if (m_trayIcon) {
+        m_trayIcon->showMessage(title, text, QSystemTrayIcon::Information, timeout);
+    }
 }
 
 void Controller::updateConfigComponents() {
     if (m_configWindow) {
-        m_configWindow->updateComponents();
+        m_configWindow->updateChildren();
     }
+}
+
+void Controller::startFullscreenCapture(const uint id) {
+    bool ok = true;
+    QPixmap p(ScreenGrabber().grabEntireDesktop(ok));
+    if (ok) {
+        emit captureTaken(id, p);
+    } else {
+        emit captureFailed(id);
+    }
+}
+
+void Controller::handleCaptureTaken(uint id, QPixmap p) {
+    auto it = m_requestMap.find(id);
+    if (it != m_requestMap.end()) {
+        it.value().exportCapture(p);
+        m_requestMap.erase(it);
+    }
+}
+
+void Controller::handleCaptureFailed(uint id) {
+    m_requestMap.remove(id);
+}
+
+void Controller::doLater(int msec, QObject *receiver, lambda func)  {
+    QTimer *timer = new QTimer(receiver);
+    QObject::connect(timer, &QTimer::timeout, receiver,
+                     [timer, func](){ func(); timer->deleteLater(); });
+    timer->setInterval(msec);
+    timer->start();
 }

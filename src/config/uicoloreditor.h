@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,11 +15,10 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef UICOLORPICKER_H
-#define UICOLORPICKER_H
+#pragma once
 
 #include "color_wheel.hpp"
-#include "src/capture/widget/capturebutton.h"
+#include "src/widgets/capture/capturebutton.h"
 #include <QGroupBox>
 
 class QVBoxLayout;
@@ -56,7 +55,4 @@ private:
 
     void initColorWheel();
     void initButtons();
-
 };
-
-#endif // UICOLORPICKER_H

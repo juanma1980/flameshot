@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -18,7 +18,9 @@
 #include "src/utils/confighandler.h"
 #include "uicoloreditor.h"
 #include "clickablelabel.h"
+#include "src/utils/globalvalues.h"
 #include <QHBoxLayout>
+#include <QApplication>
 #include <QVBoxLayout>
 #include <QComboBox>
 #include <QMap>
@@ -29,13 +31,17 @@ UIcolorEditor::UIcolorEditor(QWidget *parent) : QGroupBox(parent) {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_hLayout = new QHBoxLayout;
     m_vLayout = new QVBoxLayout;
-    m_hLayout->addItem(new QSpacerItem(10, 10, QSizePolicy::Expanding));
+
+    const int space = QApplication::fontMetrics().lineSpacing();
+    m_hLayout->addItem(new QSpacerItem(space, space, QSizePolicy::Expanding));
     m_vLayout->setAlignment(Qt::AlignVCenter);
+
     initButtons();
     initColorWheel();
-    m_vLayout->addSpacing(10);
+
+    m_vLayout->addSpacing(space);
     m_hLayout->addLayout(m_vLayout);
-    m_hLayout->addItem(new QSpacerItem(10, 10, QSizePolicy::Expanding));
+    m_hLayout->addItem(new QSpacerItem(space, space, QSizePolicy::Expanding));
     setLayout(m_hLayout);
     updateComponents();
 }
@@ -44,13 +50,13 @@ void UIcolorEditor::updateComponents() {
     ConfigHandler config;
     m_uiColor = config.uiMainColorValue();
     m_contrastColor = config.uiContrastColorValue();
+    m_buttonContrast->setColor(m_contrastColor);
+    m_buttonMainColor->setColor(m_uiColor);
     if (m_lastButtonPressed == m_buttonMainColor) {
         m_colorWheel->setColor(m_uiColor);
     } else {
         m_colorWheel->setColor(m_contrastColor);
     }
-    m_buttonContrast->setColor(m_contrastColor);
-    m_buttonMainColor->setColor(m_uiColor);
 }
 
 // updateUIcolor updates the appearance of the buttons
@@ -80,8 +86,9 @@ void UIcolorEditor::initColorWheel() {
     connect(m_colorWheel, &color_widgets::ColorWheel::colorChanged, this,
             &UIcolorEditor::updateLocalColor);
 
-    m_colorWheel->setMinimumSize(100, 100);
-    m_colorWheel->setMaximumSize(170, 170);
+    const int size = GlobalValues::buttonBaseSize() * 3;
+    m_colorWheel->setMinimumSize(size, size);
+    m_colorWheel->setMaximumSize(size*2, size*2);
     m_colorWheel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_colorWheel->setToolTip(tr("Change the color moving the selectors and see"
                                 " the changes in the preview buttons."));
@@ -90,8 +97,8 @@ void UIcolorEditor::initColorWheel() {
 }
 
 void UIcolorEditor::initButtons() {
-    const int extraSize = 10;
-    int frameSize = CaptureButton::buttonBaseSize() + extraSize;
+    const int extraSize = GlobalValues::buttonBaseSize() / 3;
+    int frameSize = GlobalValues::buttonBaseSize() + extraSize;
 
     m_vLayout->addWidget(new QLabel(tr("Select a Button to modify it"), this));
 
@@ -129,7 +136,7 @@ void UIcolorEditor::initButtons() {
             this, &UIcolorEditor::changeLastButton);
     connect(m_buttonContrast, &CaptureButton::pressedButton,
             this, &UIcolorEditor::changeLastButton);
-    // clicking the labels chages the button too
+    // clicking the labels changes the button too
     connect(m_labelMain, &ClickableLabel::clicked,
             this, [this]{ changeLastButton(m_buttonMainColor); });
     connect(m_labelContrast, &ClickableLabel::clicked,
@@ -140,7 +147,6 @@ void UIcolorEditor::initButtons() {
 // visual update for the selected button
 void UIcolorEditor::changeLastButton(CaptureButton *b) {
     if (m_lastButtonPressed != b) {
-        m_lastButtonPressed->setIcon(QIcon());
         m_lastButtonPressed = b;
 
         QString offStyle("QLabel { color : gray; }");

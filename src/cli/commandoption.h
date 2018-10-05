@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,16 +15,14 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef COMMANDOPTION_H
-#define COMMANDOPTION_H
+#pragma once
 
 #include <QStringList>
 #include <functional>
 
 using std::function;
 
-class CommandOption
-{
+class CommandOption {
 public:
     CommandOption(const QString &name, const QString &description,
                   const QString &valueName = QString(),
@@ -37,6 +35,7 @@ public:
     void setName(const QString &name);
     void setNames(const QStringList &names);
     QStringList names() const;
+    QStringList dashedNames() const;
 
     void setValueName(const QString &name);
     QString valueName() const;
@@ -62,7 +61,4 @@ private:
 
     function<bool(QString const&)> m_checker;
     QString m_errorMsg;
-
 };
-
-#endif // COMMANDOPTION_H

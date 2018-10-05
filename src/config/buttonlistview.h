@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,15 +15,14 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef BUTTONLISTVIEW_H
-#define BUTTONLISTVIEW_H
+#pragma once
 
-#include "src/capture/widget/capturebutton.h"
+#include "src/widgets/capture/capturebutton.h"
 #include <QListWidget>
 
 class ButtonListView : public QListWidget {
 public:
-    ButtonListView(QWidget *parent= nullptr);
+    explicit ButtonListView(QWidget *parent= nullptr);
 
 public slots:
     void selectAll();
@@ -36,11 +35,8 @@ protected:
     void initButtonList();
 
 private:
-    QList<int> m_listButtons;
+    QVector<CaptureButton::ButtonType> m_listButtons;
     QMap<QString, CaptureButton::ButtonType> m_buttonTypeByName;
 
     void updateActiveButtons(QListWidgetItem *);
-
 };
-
-#endif // BUTTONLISTVIEW_H

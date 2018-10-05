@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,15 +15,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef COMMANDLINEPARSER_H
-#define COMMANDLINEPARSER_H
+#pragma once
 
 #include "src/cli/commandargument.h"
 #include "src/cli/commandoption.h"
 #include <QMap>
 
-class CommandLineParser
-{
+class CommandLineParser {
 public:
     CommandLineParser();
 
@@ -57,7 +55,7 @@ private:
     QString  m_generalErrorMessage;
 
     struct Node {
-        Node(const CommandArgument &arg) : argument(arg) {}
+        explicit Node(const CommandArgument &arg) : argument(arg) {}
         Node() {}
         bool operator==(const Node &n) const {
             return argument == n.argument &&
@@ -88,7 +86,4 @@ private:
     bool processOptions(const QStringList &args,
                         QStringList::const_iterator &actualIt,
                         Node *const actualNode);
-
 };
-
-#endif // COMMANDLINEPARSER_H

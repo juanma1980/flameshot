@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -16,10 +16,9 @@
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "buttonlistview.h"
-#include "src/capture/tools/toolfactory.h"
+#include "src/tools/toolfactory.h"
 #include "src/utils/confighandler.h"
 #include <QListWidgetItem>
-#include <QSettings>
 #include <algorithm>
 
 ButtonListView::ButtonListView(QWidget *parent) : QListWidget(parent) {
@@ -46,14 +45,7 @@ void ButtonListView::initButtonList() {
 
         // when the background is lighter than gray, it uses the white icons
         QColor bgColor = this->palette().color(QWidget::backgroundRole());
-        QString color = bgColor.valueF() < 0.6 ? "White" : "Black";
-        QString iconPath = QString(":/img/buttonIcons%1/%2")
-                .arg(color).arg(tool->iconName());
-        if (t == CaptureButton::TYPE_SELECTIONINDICATOR) {
-            iconPath = QString(":/img/buttonIcons%1/size_indicator.png")
-                    .arg(color);
-        }
-        m_buttonItem->setIcon(QIcon(iconPath));
+        m_buttonItem->setIcon(tool->icon(bgColor, false));
 
         m_buttonItem->setFlags(Qt::ItemIsUserCheckable);
         QColor foregroundColor = this->palette().color(QWidget::foregroundRole());
@@ -67,15 +59,18 @@ void ButtonListView::initButtonList() {
 
 void ButtonListView::updateActiveButtons(QListWidgetItem *item) {
     CaptureButton::ButtonType bType = m_buttonTypeByName[item->text()];
-    int buttonIndex = static_cast<int>(bType);
-
     if (item->checkState() == Qt::Checked) {
-        m_listButtons.append(buttonIndex);
-        std::sort(m_listButtons.begin(), m_listButtons.end());
+        m_listButtons.append(bType);
+        // TODO refactor so we don't need external sorts
+        using bt = CaptureButton::ButtonType;
+        std::sort(m_listButtons.begin(), m_listButtons.end(), [](bt a, bt b){
+            return CaptureButton::getPriorityByButton(a) <
+                    CaptureButton::getPriorityByButton(b);
+        });
     } else {
-        m_listButtons.removeOne(buttonIndex);
+        m_listButtons.remove(m_listButtons.indexOf(bType));
     }
-    QSettings().setValue("buttons", QVariant::fromValue(m_listButtons));
+    ConfigHandler().setButtons(m_listButtons);
 }
 
 void ButtonListView::reverseItemCheck(QListWidgetItem *item){
@@ -96,11 +91,12 @@ void ButtonListView::selectAll() {
 }
 
 void ButtonListView::updateComponents() {
-    m_listButtons = QSettings().value("buttons").value<QList<int> >();
+    m_listButtons = ConfigHandler().getButtons();
     auto listTypes = CaptureButton::getIterableButtonTypes();
     for(int i = 0; i < this->count(); ++i) {
         QListWidgetItem* item = this->item(i);
-        if (m_listButtons.contains(listTypes.at(i))) {
+        auto elem = static_cast<CaptureButton::ButtonType>(listTypes.at(i));
+        if (m_listButtons.contains(elem)) {
             item->setCheckState(Qt::Checked);
         } else {
             item->setCheckState(Qt::Unchecked);

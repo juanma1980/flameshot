@@ -1,16 +1,31 @@
 #include "systemnotification.h"
 #include "src/utils/confighandler.h"
+#include <QApplication>
+
+#ifndef Q_OS_WIN
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusInterface>
-#include <QApplication>
+#else
+#endif
+#include "src/core/controller.h"
 
+#if defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
 SystemNotification::SystemNotification(QObject *parent) : QObject(parent) {
-    m_interface = new QDBusInterface("org.freedesktop.Notifications",
-                                     "/org/freedesktop/Notifications",
-                                     "org.freedesktop.Notifications",
+    m_interface = new QDBusInterface(QStringLiteral("org.freedesktop.Notifications"),
+                                     QStringLiteral("/org/freedesktop/Notifications"),
+                                     QStringLiteral("org.freedesktop.Notifications"),
                                      QDBusConnection::sessionBus(),
                                      this);
+}
+#else
+SystemNotification::SystemNotification(QObject *parent) : QObject(parent) {
+    m_interface = nullptr;
+}
+#endif
+
+void SystemNotification::sendMessage(const QString &text) {
+    sendMessage(text, tr("Flameshot Info"));
 }
 
 void SystemNotification::sendMessage(
@@ -22,14 +37,19 @@ void SystemNotification::sendMessage(
         return;
     }
 
+#ifndef Q_OS_WIN
     QList<QVariant> args;
     args << (qAppName())                 //appname
          << static_cast<unsigned int>(0) //id
-         << "flameshot.png"              //icon
+         << "flameshot"                  //icon
          << title                        //summary
          << text                         //body
          << QStringList()                //actions
          << QVariantMap()                //hints
          << timeout;                     //timeout
     m_interface->callWithArgumentList(QDBus::AutoDetect, "Notify", args);
+#else
+    auto c = Controller::getInstance();
+    c->sendTrayNotification(text, title, timeout);
+#endif
 }

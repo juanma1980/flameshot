@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,13 +15,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef CLICKABLELABEL_H
-#define CLICKABLELABEL_H
+#pragma once
 
 #include <QLabel>
 
-class ClickableLabel : public QLabel
-{
+class ClickableLabel : public QLabel {
     Q_OBJECT
 public:
     explicit ClickableLabel(QWidget *parent = nullptr);
@@ -32,7 +30,4 @@ signals:
 
 private:
     void mousePressEvent (QMouseEvent *);
-
 };
-
-#endif // CLICKABLELABEL_H

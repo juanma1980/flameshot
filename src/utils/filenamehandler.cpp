@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -31,26 +31,25 @@ QString FileNameHandler::parsedPattern() {
 }
 
 QString FileNameHandler::parseFilename(const QString &name) {
-    QString res;
+    QString res = name;
     if (name.isEmpty()) {
-        res = tr("screenshot");
-    } else {
-        std::time_t t = std::time(NULL);
-
-        char *tempData = QStringTocharArr(name);
-        char data[MAX_CHARACTERS] = {0};
-        std::strftime(data, sizeof(data),
-                      tempData, std::localtime(&t));
-        res = QString::fromLocal8Bit(data, strlen(data));
-        free(tempData);
+        res = "%F_%H-%M";
     }
+    std::time_t t = std::time(NULL);
+
+    char *tempData = QStringTocharArr(res);
+    char data[MAX_CHARACTERS] = {0};
+    std::strftime(data, sizeof(data),
+                  tempData, std::localtime(&t));
+    res = QString::fromLocal8Bit(data, (int)strlen(data));
+    free(tempData);
+
     // add the parsed pattern in a correct format for the filesystem
-    res = res.replace("/", "⁄");
+    res = res.replace("/", "⁄").replace(":", "-");
     return res;
 }
 
-QString FileNameHandler::generateAbsolutePath(const QString &path)
-{
+QString FileNameHandler::generateAbsolutePath(const QString &path) {
     QString directory = path;
     QString filename = parsedPattern();
     fixPath(directory, filename);
@@ -70,6 +69,11 @@ QString FileNameHandler::absoluteSavePath(QString &directory, QString &filename)
     filename = parsedPattern();
     fixPath(directory, filename);
     return directory + filename;
+}
+
+QString FileNameHandler::absoluteSavePath() {
+    QString dir, file;
+    return absoluteSavePath(dir, file);
 }
 
 QString FileNameHandler::charArrToQString(const char *c) {

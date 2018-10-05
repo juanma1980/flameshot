@@ -29,6 +29,7 @@
 #include <QtCore/QSharedMemory>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QCryptographicHash>
+#include <QtCore/QDataStream>
 #include <QtNetwork/QLocalServer>
 #include <QtNetwork/QLocalSocket>
 
@@ -45,10 +46,6 @@
 #include "singleapplication.h"
 #include "singleapplication_p.h"
 
-static const char NewInstance = 'N';
-static const char SecondaryInstance = 'S';
-static const char Reconnect =  'R';
-static const char InvalidConnection = '\0';
 
 SingleApplicationPrivate::SingleApplicationPrivate( SingleApplication *q_ptr ) : q_ptr( q_ptr ) {
     server = nullptr;
@@ -61,14 +58,17 @@ SingleApplicationPrivate::~SingleApplicationPrivate()
         socket->close();
         delete socket;
     }
+
     memory->lock();
-    InstancesInfo* inst = (InstancesInfo*)memory->data();
+    InstancesInfo* inst = static_cast<InstancesInfo*>(memory->data());
     if( server != nullptr ) {
         server->close();
         delete server;
         inst->primary = false;
+        inst->primaryPid = -1;
     }
     memory->unlock();
+
     delete memory;
 }
 
@@ -128,6 +128,8 @@ void SingleApplicationPrivate::genBlockServerName( int timeout )
 
 void SingleApplicationPrivate::startPrimary( bool resetMemory )
 {
+    Q_Q(SingleApplication);
+
 #ifdef Q_OS_UNIX
     // Handle any further termination signals to ensure the
     // QSharedMemory block is deleted even if the process crashes
@@ -156,14 +158,14 @@ void SingleApplicationPrivate::startPrimary( bool resetMemory )
 
     // Reset the number of connections
     memory->lock();
-    InstancesInfo* inst = (InstancesInfo*)memory->data();
+    InstancesInfo* inst = static_cast<InstancesInfo*>(memory->data());
 
-    if( resetMemory ){
-        inst->primary = true;
+    if( resetMemory ) {
         inst->secondary = 0;
-    } else {
-        inst->primary = true;
     }
+
+    inst->primary = true;
+    inst->primaryPid = q->applicationPid();
 
     memory->unlock();
 
@@ -179,7 +181,7 @@ void SingleApplicationPrivate::startSecondary()
 #endif
 }
 
-void SingleApplicationPrivate::connectToPrimary( int msecs, char connectionType )
+void SingleApplicationPrivate::connectToPrimary( int msecs, ConnectionType connectionType )
 {
     // Connect to the Local Server of the Primary Instance if not already
     // connected.
@@ -205,16 +207,31 @@ void SingleApplicationPrivate::connectToPrimary( int msecs, char connectionType 
     // Initialisation message according to the SingleApplication protocol
     if( socket->state() == QLocalSocket::ConnectedState ) {
         // Notify the parent that a new instance had been started;
-        QByteArray initMsg = blockServerName.toLatin1();
-
-        initMsg.append( connectionType );
-        initMsg.append( (const char *)&instanceNumber, sizeof(quint32) );
-        initMsg.append( QByteArray::number( qChecksum( initMsg.constData(), initMsg.length() ), 256) );
+        QByteArray initMsg;
+        QDataStream writeStream(&initMsg, QIODevice::WriteOnly);
+        writeStream.setVersion(QDataStream::Qt_5_2);
+        writeStream << blockServerName.toLatin1();
+        writeStream << static_cast<quint8>(connectionType);
+        writeStream << instanceNumber;
+        quint16 checksum = qChecksum(initMsg.constData(), static_cast<quint32>(initMsg.length()));
+        writeStream << checksum;
 
         socket->write( initMsg );
         socket->flush();
         socket->waitForBytesWritten( msecs );
     }
+}
+
+qint64 SingleApplicationPrivate::primaryPid()
+{
+    qint64 pid;
+
+    memory->lock();
+    InstancesInfo* inst = static_cast<InstancesInfo*>(memory->data());
+    pid = inst->primaryPid;
+    memory->unlock();
+
+    return pid;
 }
 
 #ifdef Q_OS_UNIX
@@ -240,7 +257,7 @@ void SingleApplicationPrivate::connectToPrimary( int msecs, char connectionType 
 
     void SingleApplicationPrivate::terminate( int signum )
     {
-        delete ((SingleApplication*)QApplication::instance())->d_ptr;
+        delete ((SingleApplication*)QCoreApplication::instance())->d_ptr;
         ::exit( 128 + signum );
     }
 #endif
@@ -254,39 +271,34 @@ void SingleApplicationPrivate::slotConnectionEstablished()
 
     QLocalSocket *nextConnSocket = server->nextPendingConnection();
 
-    // Verify that the new connection follows the SingleApplication protocol
-    char connectionType = InvalidConnection;
-    quint32 instanceId;
-    QByteArray initMsg, tmp;
+    quint32 instanceId = 0;
+    ConnectionType connectionType = InvalidConnection;
     if( nextConnSocket->waitForReadyRead( 100 ) ) {
-        tmp = nextConnSocket->read( blockServerName.length() );
-        // Verify that the socket data start with blockServerName
-        if( tmp == blockServerName.toLatin1() ) {
-            initMsg = tmp;
-            connectionType = nextConnSocket->read( 1 )[0];
+        // read all data from message in same order/format as written
+        QByteArray msgBytes = nextConnSocket->read(nextConnSocket->bytesAvailable() - static_cast<qint64>(sizeof(quint16)));
+        QByteArray checksumBytes = nextConnSocket->read(sizeof(quint16));
+        QDataStream readStream(msgBytes);
+        readStream.setVersion(QDataStream::Qt_5_2);
 
-            switch( connectionType ) {
-            case NewInstance:
-            case SecondaryInstance:
-            case Reconnect:
-            {
-                initMsg += connectionType;
-                tmp = nextConnSocket->read( sizeof(quint32) );
-                const char * data = tmp.constData();
-                instanceId = (quint32)*data;
-                initMsg += tmp;
-                // Verify the checksum of the initMsg
-                QByteArray checksum = QByteArray::number(
-                    qChecksum( initMsg.constData(), initMsg.length() ),
-                    256
-                );
-                tmp = nextConnSocket->read( checksum.length() );
-                if( checksum == tmp )
-                    break; // Otherwise set to invalid connection (next line)
-            }
-            default:
-                connectionType = InvalidConnection;
-            }
+        // server name
+        QByteArray latin1Name;
+        readStream >> latin1Name;
+        // connectioon type
+        quint8 connType = InvalidConnection;
+        readStream >> connType;
+        connectionType = static_cast<ConnectionType>(connType);
+        // instance id
+        readStream >> instanceId;
+        // checksum
+        quint16 msgChecksum = 0;
+        QDataStream checksumStream(checksumBytes);
+        checksumStream.setVersion(QDataStream::Qt_5_2);
+        checksumStream >> msgChecksum;
+
+        const quint16 actualChecksum = qChecksum(msgBytes.constData(), static_cast<quint32>(msgBytes.length()));
+
+        if (readStream.status() != QDataStream::Ok || QLatin1String(latin1Name) != blockServerName || msgChecksum != actualChecksum) {
+          connectionType = InvalidConnection;
         }
     }
 
@@ -301,7 +313,7 @@ void SingleApplicationPrivate::slotConnectionEstablished()
         &QLocalSocket::aboutToClose,
         this,
         [nextConnSocket, instanceId, this]() {
-            Q_EMIT this->slotClientConnectionClosed( nextConnSocket, instanceId );
+            emit this->slotClientConnectionClosed( nextConnSocket, instanceId );
         }
     );
 
@@ -310,7 +322,7 @@ void SingleApplicationPrivate::slotConnectionEstablished()
         &QLocalSocket::readyRead,
         this,
         [nextConnSocket, instanceId, this]() {
-            Q_EMIT this->slotDataAvailable( nextConnSocket, instanceId );
+            emit this->slotDataAvailable( nextConnSocket, instanceId );
         }
     );
 
@@ -319,24 +331,24 @@ void SingleApplicationPrivate::slotConnectionEstablished()
             options & SingleApplication::Mode::SecondaryNotification
         )
     ) {
-        Q_EMIT q->instanceStarted();
+        emit q->instanceStarted();
     }
 
     if( nextConnSocket->bytesAvailable() > 0 ) {
-        Q_EMIT this->slotDataAvailable( nextConnSocket, instanceId );
+        emit this->slotDataAvailable( nextConnSocket, instanceId );
     }
 }
 
 void SingleApplicationPrivate::slotDataAvailable( QLocalSocket *dataSocket, quint32 instanceId )
 {
     Q_Q(SingleApplication);
-    Q_EMIT q->receivedMessage( instanceId, dataSocket->readAll() );
+    emit q->receivedMessage( instanceId, dataSocket->readAll() );
 }
 
 void SingleApplicationPrivate::slotClientConnectionClosed( QLocalSocket *closedSocket, quint32 instanceId )
 {
     if( closedSocket->bytesAvailable() > 0 )
-        Q_EMIT slotDataAvailable( closedSocket, instanceId  );
+        emit slotDataAvailable( closedSocket, instanceId  );
     closedSocket->deleteLater();
 }
 
@@ -377,7 +389,7 @@ SingleApplication::SingleApplication( int &argc, char *argv[], bool allowSeconda
         // Attempt to attach to the memory segment
         if( d->memory->attach() ) {
             d->memory->lock();
-            InstancesInfo* inst = (InstancesInfo*)d->memory->data();
+            InstancesInfo* inst = static_cast<InstancesInfo*>(d->memory->data());
 
             if( ! inst->primary ) {
                 d->startPrimary( false );
@@ -391,7 +403,7 @@ SingleApplication::SingleApplication( int &argc, char *argv[], bool allowSeconda
                 d->instanceNumber = inst->secondary;
                 d->startSecondary();
                 if( d->options & Mode::SecondaryNotification ) {
-                    d->connectToPrimary( timeout, SecondaryInstance );
+                    d->connectToPrimary( timeout, SingleApplicationPrivate::SecondaryInstance );
                 }
                 d->memory->unlock();
                 return;
@@ -401,7 +413,7 @@ SingleApplication::SingleApplication( int &argc, char *argv[], bool allowSeconda
         }
     }
 
-    d->connectToPrimary( timeout, NewInstance );
+    d->connectToPrimary( timeout, SingleApplicationPrivate::NewInstance );
     delete d;
     ::exit( EXIT_SUCCESS );
 }
@@ -433,6 +445,12 @@ quint32 SingleApplication::instanceId()
     return d->instanceNumber;
 }
 
+qint64 SingleApplication::primaryPid()
+{
+    Q_D(SingleApplication);
+    return d->primaryPid();
+}
+
 bool SingleApplication::sendMessage( QByteArray message, int timeout )
 {
     Q_D(SingleApplication);
@@ -441,7 +459,7 @@ bool SingleApplication::sendMessage( QByteArray message, int timeout )
     if( isPrimary() ) return false;
 
     // Make sure the socket is connected
-    d->connectToPrimary( timeout,  Reconnect );
+    d->connectToPrimary( timeout,  SingleApplicationPrivate::Reconnect );
 
     d->socket->write( message );
     bool dataWritten = d->socket->flush();

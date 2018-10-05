@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,27 +15,31 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef FLAMESHOTDBUSADAPTER_H
-#define FLAMESHOTDBUSADAPTER_H
+#pragma once
 
 #include <QtDBus/QDBusAbstractAdaptor>
 #include "src/core/controller.h"
 
-class FlameshotDBusAdapter : public QDBusAbstractAdaptor
-{
+class FlameshotDBusAdapter : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.dharkael.Flameshot")
 
 public:
-    FlameshotDBusAdapter(QObject *parent = nullptr);
+    explicit FlameshotDBusAdapter(QObject *parent = nullptr);
     virtual ~FlameshotDBusAdapter();
 
+signals:
+    void captureTaken(uint id, QByteArray rawImage);
+    void captureFailed(uint id);
+
 public slots:
-    Q_NOREPLY void graphicCapture(QString path, int delay);
-    Q_NOREPLY void fullScreen(QString path, bool toClipboard, int delay);
+    Q_NOREPLY void graphicCapture(QString path, int delay, uint id);
+    Q_NOREPLY void fullScreen(QString path, bool toClipboard, int delay, uint id);
+    Q_NOREPLY void captureScreen(int number, QString path, bool toClipboard, int delay, uint id);
     Q_NOREPLY void openConfig();
     Q_NOREPLY void trayIconEnabled(bool enabled);
+    Q_NOREPLY void autostartEnabled(bool enabled);
 
+private slots:
+    void handleCaptureTaken(uint id, const QPixmap &p);
 };
-
-#endif // FLAMESHOTDBUSADAPTER_H

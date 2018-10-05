@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,24 +15,19 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef CONFIGURATION_H
-#define CONFIGURATION_H
+#pragma once
 
 #include <QTabWidget>
 
-class ButtonListView;
-class UIcolorEditor;
 class FileNameEditor;
 class GeneneralConf;
 class QFileSystemWatcher;
+class VisualsEditor;
 
 class ConfigWindow : public QTabWidget {
     Q_OBJECT
 public:
     explicit ConfigWindow(QWidget *parent = nullptr);
-
-public slots:
-    void updateComponents();
 
 signals:
     void updateChildren();
@@ -41,13 +36,8 @@ protected:
     void keyPressEvent(QKeyEvent *);
 
 private:
-    ButtonListView *m_buttonList;
-    UIcolorEditor *m_colorEditor;
     FileNameEditor *m_filenameEditor;
     GeneneralConf *m_generalConfig;
-
+    VisualsEditor *m_visuals;
     QFileSystemWatcher *m_configWatcher;
-
 };
-
-#endif // CONFIGURATION_H

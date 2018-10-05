@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,10 +15,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef FILENAMEEDITOR_H
-#define FILENAMEEDITOR_H
+#pragma once
 
-#include <QGroupBox>
+#include <QWidget>
 #include <QPointer>
 
 class QVBoxLayout;
@@ -27,8 +26,7 @@ class FileNameHandler;
 class QPushButton;
 class StrftimeChooserWidget;
 
-class FileNameEditor : public QGroupBox
-{
+class FileNameEditor : public QWidget {
     Q_OBJECT
 public:
     explicit FileNameEditor(QWidget *parent = nullptr);
@@ -54,7 +52,4 @@ private slots:
     void savePattern();
     void showParsedPattern(const QString &);
     void resetName();
-
 };
-
-#endif // FILENAMEEDITOR_H

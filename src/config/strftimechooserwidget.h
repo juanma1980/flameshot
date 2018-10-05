@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,13 +15,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef STRFTIMECHOOSERWIDGET_H
-#define STRFTIMECHOOSERWIDGET_H
+#pragma once
 
 #include <QWidget>
 
-class StrftimeChooserWidget : public QWidget
-{
+class StrftimeChooserWidget : public QWidget {
     Q_OBJECT
 public:
     explicit StrftimeChooserWidget(QWidget *parent = nullptr);
@@ -31,7 +29,4 @@ signals:
 
 private:
     static QMap<QString, QString> m_buttonData;
-
 };
-
-#endif // STRFTIMECHOOSERWIDGET_H

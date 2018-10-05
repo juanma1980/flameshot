@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -25,7 +25,7 @@
 #include <QLabel>
 #include <QPushButton>
 
-FileNameEditor::FileNameEditor(QWidget *parent) : QGroupBox(parent) {
+FileNameEditor::FileNameEditor(QWidget *parent) : QWidget(parent) {
     initWidgets();
     initLayout();    
 }
@@ -59,7 +59,7 @@ void FileNameEditor::initWidgets() {
     m_outputLabel = new QLineEdit(this);
     m_outputLabel->setDisabled(true);
     QString foreground = this->palette().foreground().color().name();
-    m_outputLabel->setStyleSheet(QString("color: %1").arg(foreground));
+    m_outputLabel->setStyleSheet(QStringLiteral("color: %1").arg(foreground));
     QPalette pal = m_outputLabel->palette();
     QColor color = pal.color(QPalette::Disabled, m_outputLabel->backgroundRole());
     pal.setColor(QPalette::Active, m_outputLabel->backgroundRole(), color);

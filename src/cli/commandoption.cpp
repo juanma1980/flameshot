@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -46,6 +46,18 @@ void CommandOption::setNames(const QStringList &names) {
 
 QStringList CommandOption::names() const {
     return m_names;
+}
+
+QStringList CommandOption::dashedNames() const {
+    QStringList dashedNames;
+    for (const QString &name: m_names) {
+        // prepend "-" to single character options, and "--" to the others
+        QString dashedName = (name.length() == 1) ?
+                    QStringLiteral("-%1").arg(name) :
+                    QStringLiteral("--%1").arg(name);
+        dashedNames << dashedName;
+    }
+    return dashedNames;
 }
 
 void CommandOption::setValueName(const QString &name) {

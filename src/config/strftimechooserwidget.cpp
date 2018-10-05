@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -37,7 +37,7 @@ StrftimeChooserWidget::StrftimeChooserWidget(QWidget *parent) : QWidget(parent) 
             button->setMinimumHeight(25);
             layout->addWidget(button, j, i);
             connect(button, &QPushButton::clicked,
-                    this, [variable, this](){Q_EMIT variableEmitted(variable);});
+                    this, [variable, this](){emit variableEmitted(variable);});
         }
     }
     setLayout(layout);
@@ -57,8 +57,8 @@ QMap<QString, QString> StrftimeChooserWidget::m_buttonData {
     { QT_TR_NOOP("Day (01-31)"),            "%d"},
     { QT_TR_NOOP("Day of Month (1-31)"),    "%e"},
     { QT_TR_NOOP("Day (001-366)"),          "%j"},
-    { QT_TR_NOOP("Time (%H:%M:%S)"),        "%T"},
-    { QT_TR_NOOP("Time (%H:%M)"),           "%R"},
+    { QT_TR_NOOP("Time (%H-%M-%S)"),        "%T"},
+    { QT_TR_NOOP("Time (%H-%M)"),           "%R"},
     { QT_TR_NOOP("Hour (00-23)"),           "%H"},
     { QT_TR_NOOP("Hour (01-12)"),           "%I"},
     { QT_TR_NOOP("Minute (00-59)"),         "%M"},

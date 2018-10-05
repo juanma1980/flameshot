@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,13 +15,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef COMMANDARGUMENT_H
-#define COMMANDARGUMENT_H
+#pragma once
 
 #include <QString>
 
-class CommandArgument
-{
+class CommandArgument {
 public:
     CommandArgument();
     explicit CommandArgument(const QString &name, const QString &description);
@@ -39,7 +37,4 @@ public:
 private:
     QString m_name;
     QString m_description;
-
 };
-
-#endif // COMMANDARGUMENT_H

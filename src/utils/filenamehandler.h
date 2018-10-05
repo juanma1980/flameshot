@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,14 +15,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef FILENAMEHANDLER_H
-#define FILENAMEHANDLER_H
+#pragma once
 
 #include <QObject>
 
-
-class FileNameHandler : public QObject
-{
+class FileNameHandler : public QObject {
     Q_OBJECT
 public:
     explicit FileNameHandler(QObject *parent = nullptr);
@@ -31,6 +28,8 @@ public:
     QString parseFilename(const QString &name);
     QString generateAbsolutePath(const QString &path);
     QString absoluteSavePath(QString &directory, QString &filename);
+    QString absoluteSavePath();
+
 
     static const int MAX_CHARACTERS = 70;
 
@@ -43,7 +42,4 @@ private:
     char * QStringTocharArr(const QString &s);
 
     void fixPath(QString &directory, QString &filename);
-
 };
-
-#endif // FILENAMEHANDLER_H

@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -15,18 +15,18 @@
 //     You should have received a copy of the GNU General Public License
 //     along with Flameshot.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef GENENERALCONF_H
-#define GENENERALCONF_H
+#pragma once
 
-#include <QGroupBox>
+#include <QWidget>
 
 class QVBoxLayout;
 class QCheckBox;
+class QPushButton;
 
-class GeneneralConf : public QGroupBox {
+class GeneneralConf : public QWidget {
     Q_OBJECT
 public:
-    GeneneralConf(QWidget *parent = nullptr);
+    explicit GeneneralConf(QWidget *parent = nullptr);
 
 public slots:
     void updateComponents();
@@ -35,17 +35,24 @@ private slots:
    void showHelpChanged(bool checked);
    void showDesktopNotificationChanged(bool checked);
    void showTrayIconChanged(bool checked);
+   void autostartChanged(bool checked);
+   void importConfiguration();
+   void exportFileConfiguration();
+   void resetConfiguration();
 
 private:
     QVBoxLayout *m_layout;
     QCheckBox *m_sysNotifications;
     QCheckBox *m_showTray;
     QCheckBox *m_helpMessage;
+    QCheckBox *m_autostart;
+    QPushButton *m_importButton;
+    QPushButton *m_exportButton;
+    QPushButton *m_resetButton;
 
     void initShowHelp();
     void initShowDesktopNotification();
     void initShowTrayIcon();
-
+    void initConfingButtons();
+    void initAutostart();
 };
-
-#endif // GENENERALCONF_H

@@ -1,4 +1,4 @@
-// Copyright 2017 Alejandro Sirgo Rica
+// Copyright(c) 2017-2018 Alejandro Sirgo Rica & Contributors
 //
 // This file is part of Flameshot.
 //
@@ -19,58 +19,58 @@
 #include "src/utils/confighandler.h"
 #include "src/utils/screengrabber.h"
 #include "src/core/controller.h"
-#include "src/core/resourceexporter.h"
-#include <QTimer>
-#include <functional>
-
-namespace {
-    using std::function;
-    using lambda = function<void(void)>;
-
-    // replace QTimer::singleShot introduced in QT 5.4
-    // the actual target QT version is QT 5.3
-    void doLater(int msec, QObject *receiver, lambda func) {
-        QTimer *timer = new QTimer(receiver);
-        QObject::connect(timer, &QTimer::timeout, receiver,
-                         [timer, func](){ func(); timer->deleteLater(); });
-        timer->setInterval(msec);
-        timer->start();
-    }
-}
-
+#include "src/utils/screenshotsaver.h"
+#include "src/utils/systemnotification.h"
+#include <QBuffer>
 FlameshotDBusAdapter::FlameshotDBusAdapter(QObject *parent)
     : QDBusAbstractAdaptor(parent)
 {
-
+    auto controller =  Controller::getInstance();
+    connect(controller, &Controller::captureFailed,
+            this, &FlameshotDBusAdapter::captureFailed);
+    connect(controller, &Controller::captureTaken,
+            this, &FlameshotDBusAdapter::handleCaptureTaken);
 }
 
 FlameshotDBusAdapter::~FlameshotDBusAdapter() {
 
 }
 
-void FlameshotDBusAdapter::graphicCapture(QString path, int delay) {
-    auto controller =  Controller::getInstance();
-    auto f = [controller, path, this]() {
-       controller->createVisualCapture(path);
-    };
-    // QTimer::singleShot(delay, controller, f); // requires Qt 5.4
-    doLater(delay, controller, f);
+void FlameshotDBusAdapter::graphicCapture(QString path, int delay, uint id) {
+    CaptureRequest req(CaptureRequest::GRAPHICAL_MODE, delay, path);
+//    if (toClipboard) {
+//        req.addTask(CaptureRequest::CLIPBOARD_SAVE_TASK);
+//    }
+    req.setStaticID(id);
+    Controller::getInstance()->requestCapture(req);
 }
 
-void FlameshotDBusAdapter::fullScreen(QString path, bool toClipboard, int delay) {
-    auto f = [path, toClipboard, this]() {
-        QPixmap p(ScreenGrabber().grabEntireDesktop());
-        if(toClipboard) {
-            ResourceExporter().captureToClipboard(p);
-        }
-        if(path.isEmpty()) {
-            ResourceExporter().captureToFileUi(p);
-        } else {
-            ResourceExporter().captureToFile(p, path);
-        }
-    };
-    //QTimer::singleShot(delay, this, f); // // requires Qt 5.4
-    doLater(delay, this, f);
+void FlameshotDBusAdapter::fullScreen(
+        QString path, bool toClipboard, int delay, uint id)
+{
+    CaptureRequest req(CaptureRequest::FULLSCREEN_MODE, delay, path);
+    if (toClipboard) {
+        req.addTask(CaptureRequest::CLIPBOARD_SAVE_TASK);
+    }
+    if (!path.isEmpty()) {
+        req.addTask(CaptureRequest::FILESYSTEM_SAVE_TASK);
+    }
+    req.setStaticID(id);
+    Controller::getInstance()->requestCapture(req);
+}
+
+void FlameshotDBusAdapter::captureScreen(int number, QString path,
+                                         bool toClipboard, int delay, uint id)
+{
+    CaptureRequest req(CaptureRequest::SCREEN_MODE, delay, path, number);
+    if (toClipboard) {
+        req.addTask(CaptureRequest::CLIPBOARD_SAVE_TASK);
+    }
+    if (!path.isEmpty()) {
+        req.addTask(CaptureRequest::FILESYSTEM_SAVE_TASK);
+    }
+    req.setStaticID(id);
+    Controller::getInstance()->requestCapture(req);
 }
 
 void FlameshotDBusAdapter::openConfig() {
@@ -84,4 +84,18 @@ void FlameshotDBusAdapter::trayIconEnabled(bool enabled) {
     } else {
         controller->disableTrayIcon();
     }
+}
+
+void FlameshotDBusAdapter::autostartEnabled(bool enabled) {
+    ConfigHandler().setStartupLaunch(enabled);
+    auto controller =  Controller::getInstance();
+    // Autostart is not saved in a .ini file, requires manual update
+    controller->updateConfigComponents();
+}
+
+void FlameshotDBusAdapter::handleCaptureTaken(uint id, const QPixmap &p) {
+    QByteArray byteArray;
+    QBuffer buffer(&byteArray);
+    p.save(&buffer, "PNG");
+    emit captureTaken(id, byteArray);
 }
